@@ -38,7 +38,7 @@ best_tree_size = min(scores, key=scores.get)
 print("Best tree size: %d" % best_tree_size)
 #42: 23075.4963
 
-final_model = DecisionTreeRegressor(max_leaf_nodes=34, random_state=0)
+final_model = DecisionTreeRegressor(max_leaf_nodes=42, random_state=0)
 final_model.fit(X, y)
 preds_test = final_model.predict(testing_X)
 output = pd.DataFrame({'Id': house_data_testing.Id, 'SalePrice': preds_test})
