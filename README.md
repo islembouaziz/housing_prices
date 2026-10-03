@@ -1,6 +1,7 @@
-# 🏠 Housing Prices Prediction — Decision Tree vs. Random Forest
+# 🏠 Housing Prices Prediction — Decision Tree · Random Forest · XGBoost
 
-A machine learning project that predicts house sale prices using the [Kaggle House Prices dataset](https://www.kaggle.com/c/house-prices-advanced-regression-techniques). Two regression models are implemented and compared: **Decision Tree Regressor** and **Random Forest Regressor**.
+A machine learning project predicting house sale prices from the [Kaggle House Prices — Advanced Regression Techniques](https://www.kaggle.com/c/house-prices-advanced-regression-techniques) dataset.  
+Three regression models are progressively built, tuned, and compared: **Decision Tree**, **Random Forest**, and **XGBoost**.
 
 ![Kaggle Housing Prices Competition](captures/pic_problem.png)
 
@@ -12,14 +13,21 @@ A machine learning project that predicts house sale prices using the [Kaggle Hou
 housing_prices/
 │
 ├── data/
-│   ├── train.csv                          # Training dataset
-│   └── test.csv                           # Test dataset
+│   ├── train.csv                           # Training dataset (1,460 rows)
+│   └── test.csv                            # Test dataset (1,459 rows)
 │
-├── DecisionTreeRegressor.py               # Decision Tree model
-├── RandomForestRegressor.py               # Random Forest model
+├── DecisionTreeRegressor.py                # Model 1 — Decision Tree
+├── RandomForestRegressor.py                # Model 2 — Random Forest
+├── xgboostregressor.py                     # Model 3 — XGBoost
 │
-├── submissionDecisionTreeRegressor.csv    # Predictions from Decision Tree
-├── submissionRandomForestRegressor.csv    # Predictions from Random Forest
+├── submissionDecisionTreeRegressor.csv     # Kaggle submission (DT)
+├── submissionRandomForestRegressor.csv     # Kaggle submission (RF)
+├── submissionXGBRegressor.csv              # Kaggle submission (XGB)
+│
+├── web/                                    # HouseIQ — interactive web app
+│   └── index.html
+├── api/                                    # REST API serving the RF model
+├── train_and_save_model.py                 # Serializes the trained RF model
 │
 └── README.md
 ```
@@ -29,29 +37,68 @@ housing_prices/
 ## 📦 Dependencies
 
 ```bash
-pip install pandas scikit-learn
+pip install pandas scikit-learn xgboost
 ```
 
 ---
 
-## 🔢 Features Used
+## 🔧 Shared Preprocessing Pipeline
 
-Both models use the same set of **27 input features** selected from the dataset:
+All three models share the **exact same preprocessing pipeline**, making the comparison fair and reproducible.
 
-| Category         | Features                                                                 |
-|------------------|--------------------------------------------------------------------------|
-| **Lot / Land**   | `MSSubClass`, `LotFrontage`, `LotArea`, `LotShape`                       |
-| **Location**     | `Neighborhood`                                                           |
-| **Style**        | `HouseStyle`, `Foundation`                                               |
-| **Quality**      | `OverallQual`, `OverallCond`, `KitchenQual`, `BsmtQual`, `GarageFinish` |
-| **Year**         | `YearBuilt`, `YearRemodAdd`                                              |
-| **Basement**     | `BsmtUnfSF`, `TotalBsmtSF`, `BsmtFullBath`                              |
-| **Living Area**  | `GrLivArea`, `1stFlrSF`, `2ndFlrSF`, `MasVnrArea`                      |
-| **Rooms**        | `FullBath`, `HalfBath`, `TotRmsAbvGrd`, `Fireplaces`                    |
-| **Garage**       | `GarageCars`, `GarageArea`                                               |
-| **Sale Info**    | `MoSold`                                                                 |
+### 1. Feature Engineering (`create_features`)
 
-> Categorical features (e.g. `Neighborhood`, `HouseStyle`) are encoded using **one-hot encoding** via `pd.get_dummies()`. Training and test sets are then **aligned** to ensure identical column structure, filling missing columns with `0`.
+Before any model sees the data, four **derived features** are computed from existing columns:
+
+| New Feature | Formula | Why it helps |
+|---|---|---|
+| `TotalSF` | `TotalBsmtSF + 1stFlrSF + 2ndFlrSF` | Single number capturing total living space |
+| `TotalBath` | `FullBath + 0.5×HalfBath + BsmtFullBath + 0.5×BsmtHalfBath` | Weighted count that respects half-bath utility |
+| `HouseAge` | `YrSold − YearBuilt` | Age at time of sale — newer houses sell higher |
+| `TotalPorchSF` | Sum of all porch/deck columns | Outdoor space is a real selling point |
+
+```python
+def create_features(df):
+    df['TotalSF']      = df['TotalBsmtSF'] + df['1stFlrSF'] + df['2ndFlrSF']
+    df['TotalBath']    = df['FullBath'] + 0.5*df['HalfBath'] + df['BsmtFullBath'] + 0.5*df['BsmtHalfBath']
+    df['HouseAge']     = df['YrSold'] - df['YearBuilt']
+    df['TotalPorchSF'] = df['OpenPorchSF'] + df['3SsnPorch'] + df['EnclosedPorch'] + df['ScreenPorch'] + df['WoodDeckSF']
+    return df
+```
+
+### 2. Sklearn Pipeline
+
+The pipeline chains two steps so that the **same transformations** are applied consistently during training, cross-validation, and inference — **no data leakage**:
+
+```
+Raw data → [Preprocessor] → [Model] → Predictions
+```
+
+| Step | Numerical columns | Categorical columns |
+|---|---|---|
+| **Imputation** | `SimpleImputer(strategy='constant')` fills NaN with 0 | `SimpleImputer(strategy='most_frequent')` fills NaN with mode |
+| **Encoding** | — | `OneHotEncoder(handle_unknown='ignore')` |
+
+```python
+preprocessor = ColumnTransformer([
+    ('num', SimpleImputer(strategy='constant'), numerical_cols),
+    ('cat', Pipeline([
+        ('imputer', SimpleImputer(strategy='most_frequent')),
+        ('onehot',  OneHotEncoder(handle_unknown='ignore'))
+    ]), categorical_cols)
+])
+
+my_pipeline = Pipeline([('preprocessor', preprocessor), ('model', model)])
+```
+
+### 3. Train / Validation Split
+
+```python
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, train_size=0.8, test_size=0.2, random_state=0)
+```
+
+80 % of the 1,460 training rows → model fitting.  
+20 % → held-out validation to compute MAE before submitting.
 
 ---
 
@@ -61,48 +108,38 @@ Both models use the same set of **27 input features** selected from the dataset:
 
 ### How it works
 
-A Decision Tree splits the data recursively based on feature thresholds to minimize prediction error. Each leaf node represents a predicted house price.
+A Decision Tree recursively splits the dataset on feature thresholds, building a binary tree.  
+Each leaf node outputs the average sale price of all training samples that fall into it.  
+The key hyperparameter is `max_leaf_nodes` — it controls the tree's complexity.
 
-### Key implementation details
+### What I tested and why
 
-```python
-# Hyperparameter tuning: find the best max_leaf_nodes
-candidate_max_leaf_nodes = [30, 31, 32, ..., 50]
-scores = {
-    leaf_size: get_mae_for_decision_tree(leaf_size, train_X, val_X, train_y, val_y)
-    for leaf_size in candidate_max_leaf_nodes
-}
-best_tree_size = min(scores, key=scores.get)
-```
-
-- The model is tuned by iterating over a range of `max_leaf_nodes` values (30 to 50).
-- For each candidate, the **Mean Absolute Error (MAE)** on the validation set is computed.
-- The best `max_leaf_nodes` found was **34**, giving an MAE of approximately **23,075 USD**.
-- The final model is retrained on the **full training set** (not just the train split) using the best parameter before generating predictions.
+> *"My first instinct was to find the optimal tree depth. I ran a loop over candidate `max_leaf_nodes` values and used 5-fold cross-validation to pick the one that generalises best — not just the one that scores best on a single split."*
 
 ```python
-final_model = DecisionTreeRegressor(max_leaf_nodes=34, random_state=0)
-final_model.fit(X, y)
-preds_test = final_model.predict(testing_X)
+def get_cv_mae(max_leaf_nodes, X, y, preprocessor):
+    test_pipeline = Pipeline([('preprocessor', preprocessor),
+                               ('model', DecisionTreeRegressor(max_leaf_nodes=max_leaf_nodes, random_state=0))])
+    scores = -1 * cross_val_score(test_pipeline, X, y, cv=5, scoring='neg_mean_absolute_error')
+    return scores.mean()
+
+# Final best: 46 leaf nodes
+leaf_nodes = 46
+avg_mae = get_cv_mae(leaf_nodes, X, y, preprocessor)
 ```
 
-### Helper function
+I tested values from 30 → 50. Too few leaves → underfitting (tree too simple). Too many → overfitting.  
+`max_leaf_nodes=46` gave the best cross-validation average, but the final submission pipeline uses `max_leaf_nodes=42`.
 
-```python
-def get_mae_for_decision_tree(max_leaf_nodes, train_X, val_X, train_y, val_y):
-    model = DecisionTreeRegressor(max_leaf_nodes=max_leaf_nodes, random_state=0)
-    model.fit(train_X, train_y)
-    preds_val = model.predict(val_X)
-    mae = mean_absolute_error(val_y, preds_val)
-    return mae
-```
-
-### Result
+### Results
 
 | Metric | Value |
-|--------|-------|
-| Best `max_leaf_nodes` | 34 |
-| Validation MAE | ~23,075 USD |
+|---|---|
+| **Validation MAE** (hold-out set) | **$23,903.84** |
+| **Average CV MAE** (5-fold, `max_leaf_nodes=46`) | **$24,698.28** |
+| **Kaggle Score** (RMSLE) | **0.19498** |
+
+> **Interpretation:** Off by ~$24k on average. Not bad for a single tree — but the tree is fundamentally limited because it must sacrifice depth (accuracy) to avoid memorising the training data.
 
 ---
 
@@ -112,118 +149,206 @@ def get_mae_for_decision_tree(max_leaf_nodes, train_X, val_X, train_y, val_y):
 
 ### How it works
 
-A Random Forest is an **ensemble** of many Decision Trees. Each tree is trained on a random subset of the training data (bootstrapping) and uses a random subset of features at each split. The final prediction is the **average** of all individual tree predictions.
+A Random Forest builds **many Decision Trees** in parallel, each trained on a random subset of the data (bootstrapping) and using only a random subset of features at each split.  
+The final prediction is the **average** of all trees — this cancels out individual errors and drastically reduces variance.
 
-### Key implementation details
+### What I tested and why
+
+> *"After getting the Decision Tree baseline, I wanted to see how much an ensemble could improve things. I started with `n_estimators=100` as a default, then experimented with more trees and with `max_depth` to control the depth of each individual tree in the forest."*
 
 ```python
-model = RandomForestRegressor(n_estimators=100, random_state=0)
-model.fit(train_X, train_y)
-preds_val = model.predict(val_X)
-preds_test = model.predict(testing_X)
-print(mean_absolute_error(val_y, preds_val))
+def get_cv_mae(n_estimators, max_depth, X, y, preprocessor):
+    test_pipeline = Pipeline([('preprocessor', preprocessor),
+                               ('model', RandomForestRegressor(n_estimators=n_estimators,
+                                                               max_depth=max_depth,
+                                                               random_state=0))])
+    scores = -1 * cross_val_score(test_pipeline, X, y, cv=5, scoring='neg_mean_absolute_error')
+    return scores.mean()
+
+# Best combination found:
+avg_mae = get_cv_mae(510, 30, X, y, preprocessor)
 ```
 
-- **`n_estimators=100`**: The forest is built using **100 decision trees**.
-- No manual hyperparameter search is needed — the ensemble nature naturally reduces overfitting.
-- The model is simpler to configure yet significantly more accurate.
+I tested several combinations of `(n_estimators, max_depth)`. More trees helped up to a point; unlimited depth was fine because bagging already handles variance.  
+Best combo found: **510 trees, max_depth=30**.  
+The final submission model uses `n_estimators=100` (faster, slightly higher MAE but still excellent).
 
-### Result
+### Results
 
 | Metric | Value |
-|--------|-------|
-| `n_estimators` | 100 |
-| Validation MAE | ~17,674 USD |
+|---|---|
+| **Validation MAE** (hold-out set) | **$17,414.45** |
+| **Average CV MAE** (5-fold, 510 trees, depth 30) | **$17,628.64** |
+| **Kaggle Score** (RMSLE) | **0.14831** |
+
+> **Interpretation:** ~27% improvement over the Decision Tree. The ensemble averaging is doing exactly what it promises — each tree's noise cancels out.
 
 ---
 
-## ⚔️ Why Random Forest is Better Than Decision Tree
+## ⚡ Model 3 — XGBoost Regressor
 
-### 📊 Results Comparison
+**File:** `xgboostregressor.py`
 
-| Model | Validation MAE | Kaggle Score |
-|-------|---------------|-------------|
-| Decision Tree (best tuned) | ~23,075 USD | 23,567.08 |
-| Random Forest (100 trees) | ~17,674 USD | 16,244.80 |
+### How it works
 
-> **Random Forest achieves ~23.5% lower error** than the best tuned Decision Tree.
+XGBoost (**Extreme Gradient Boosting**) builds trees **sequentially**, not in parallel like Random Forest.  
+Each new tree is trained to correct the **residual errors** of all previous trees.  
+This makes it much more sample-efficient: it focuses on the hard-to-predict cases.
 
-**Kaggle submission scores (lower is better):**
+Key hyperparameters:
+- `n_estimators` — how many boosting rounds (trees) to run
+- `learning_rate=0.05` — how much each tree contributes (smaller = more conservative, needs more trees)
+- `n_jobs=4` — use 4 CPU cores for faster training
 
-![Kaggle Submission Scores](captures/scores_kaggle.png)
+### What I tested and why
+
+> *"With XGBoost I experimented with the number of boosting rounds (estimators). Too few → underfitting. Too many → the model starts overfitting since boosting is more aggressive than bagging. I used 5-fold CV to find the sweet spot."*
+
+```python
+model = XGBRegressor(n_estimators=500, learning_rate=0.05, n_jobs=4, random_state=0)
+
+def get_cv_mae(n_estimators, X, y, preprocessor):
+    test_pipeline = Pipeline([('preprocessor', preprocessor),
+                               ('model', XGBRegressor(n_estimators=n_estimators,
+                                                      learning_rate=0.05,
+                                                      n_jobs=4,
+                                                      random_state=0))])
+    scores = -1 * cross_val_score(test_pipeline, X, y, cv=5, scoring='neg_mean_absolute_error')
+    return scores.mean()
+
+# Best found: 194 estimators
+estimators = 194
+avg_mae = get_cv_mae(estimators, X, y, preprocessor)
+```
+
+I started with 500 estimators and noticed cross-validation MAE stopped improving after ~194.  
+`learning_rate=0.05` is deliberately small — it makes the model learn slowly but generalise better.
+
+### Results
+
+| Metric | Value |
+|---|---|
+| **Validation MAE** (hold-out set) | **$18,019.72** |
+| **Average CV MAE** (5-fold, 194 estimators) | **$16,895.20** |
+| **Kaggle Score** (RMSLE) | **0.14785** |
+
+> **Interpretation:** The CV MAE ($16,895) is the best of all three models. The Kaggle public score (0.14785) edges out Random Forest (0.14831) — confirming XGBoost generalises best on unseen data.
 
 ---
 
-### 🧠 The Core Problems with a Single Decision Tree
+## ⚔️ Model Comparison
 
-#### 1. Overfitting (High Variance)
-A single Decision Tree, if allowed to grow deep, **memorizes the training data** rather than learning general patterns. It captures noise and outliers as if they were real signals.
+### 📊 Final Results Table
 
-- With `max_leaf_nodes` unconstrained → the tree perfectly fits training data but performs poorly on new data.
-- Even with tuning (`max_leaf_nodes=34`), the tree must sacrifice depth (and therefore accuracy) to avoid overfitting.
+| Model | Val MAE | Avg CV MAE | Kaggle RMSLE |
+|---|---|---|---|
+| 🌿 Decision Tree (`max_leaf_nodes=42`) | $23,903.84 | $24,698.28 | 0.19498 |
+| 🌲 Random Forest (`n_estimators=100`) | $17,414.45 | $17,628.64 | 0.14831 |
+| ⚡ XGBoost (`n_estimators=500, lr=0.05`) | $18,019.72 | $16,895.20 | **0.14785** |
 
-#### 2. Instability
-Decision Trees are **highly sensitive** to small changes in the training data. A slightly different train/test split can produce a completely different tree structure. This makes a single tree an unreliable model.
+> 🏆 **XGBoost wins** on both CV MAE and Kaggle score.  
+> 🥈 **Random Forest** wins on hold-out validation MAE, and powers the HouseIQ web app.
 
-#### 3. Bias-Variance Tradeoff is Hard to Balance
-- A **shallow tree** (small `max_leaf_nodes`) → high bias (underfits, too simple)
-- A **deep tree** (large `max_leaf_nodes`) → high variance (overfits, too complex)
-- Finding the sweet spot requires careful tuning and it's never perfect.
+### Kaggle Submission Scores
 
----
-
-### ✅ How Random Forest Solves These Problems
-
-| Problem | Random Forest Solution |
-|---------|------------------------|
-| **Overfitting** | Each tree sees only a random subset of data (**bagging**). Averaging 100 trees cancels out individual overfitting. |
-| **Instability** | Different trees make different errors. When averaged, random errors cancel each other out (variance reduction). |
-| **Bias-Variance** | The ensemble naturally sits at a better tradeoff — lower variance without significantly increasing bias. |
-| **Feature sensitivity** | Each split uses a **random subset of features**, preventing any single dominant feature from controlling all trees. |
+![Kaggle Submission Scores](captures/Capture%20d'écran%202026-10-03%20224522.png)
 
 ---
+
+### 🧠 Why Each Model Behaves Differently
+
+#### Decision Tree — Underfits at useful depths
+A single tree has to choose: be simple (low variance, high bias) or be complex (high variance, low bias).  
+With `max_leaf_nodes=42` it sits in a compromise zone — it is not overfitting, but it is also not capturing all patterns.
+
+#### Random Forest — Parallel ensemble, great baseline
+By averaging 100–510 independent trees, variance drops massively.  
+The trees don't "talk to each other" — they are trained independently and then averaged.  
+This makes Random Forest very robust but it can plateau because it doesn't learn from its own mistakes.
+
+#### XGBoost — Sequential boosting, learns from errors
+Each new tree specifically targets the samples the previous trees got wrong.  
+This means XGBoost squeezes more signal from the same data.  
+The risk is overfitting — which is why controlling `learning_rate` and `n_estimators` via CV is crucial.
 
 ### 📐 Mathematical Intuition
 
-For a Random Forest with `n` trees, the ensemble prediction is:
-
+**Random Forest** — variance reduction by averaging:
 ```
-ŷ = (1/n) × Σ ŷᵢ    for i = 1 to n
-```
-
-Since each tree's error `εᵢ` is independent (due to bagging and feature randomness):
-
-```
-Variance(ensemble) ≈ Variance(single tree) / n
+Variance(ensemble) ≈ Variance(single tree) / n_trees
 ```
 
-With 100 trees, the variance (instability) of the prediction is reduced by a factor of ~100 compared to a single tree — which is why the MAE drops from ~23,075 to ~17,674.
+**XGBoost** — additive residual correction:
+```
+F_m(x) = F_{m-1}(x) + η × h_m(x)
+```
+where `η` is the learning rate and `h_m` is the new tree fitted on the residuals of `F_{m-1}`.
 
 ---
 
-### 🔑 Key Takeaway
+## 🌐 HouseIQ — Interactive Web App
 
-> A single Decision Tree is like asking **one expert** for their opinion.  
-> A Random Forest is like asking **100 different experts**, each with different perspectives, and taking the average — a much more reliable answer.
+Beyond the ML scripts, a full **HouseIQ** web application was built to let anyone interact with the trained Random Forest model in real time.
+
+### Predict Price Tab
+
+Enter house details (quality, size, location, year built…) and get an instant price estimate powered by the trained model.
+
+![HouseIQ Predict Price](captures/Capture%20d'écran%202026-10-03%20223553.png)
+
+### Find by Budget Tab
+
+Enter a budget and the app scans the 1,460-house dataset to show you houses in that price range, along with average statistics (quality, area, year built, bathrooms, etc.).
+
+![HouseIQ Find by Budget](captures/Capture%20d'écran%202026-10-03%20223802.png)
+
+### How the web app connects to the model
+
+1. `train_and_save_model.py` trains the Random Forest pipeline and serialises it to disk (pickle).
+2. The `api/` folder contains a lightweight server that loads the model and exposes a `/predict` endpoint.
+3. The `web/index.html` frontend sends house feature values to the API and displays the result.
 
 ---
 
 ## 🚀 How to Run
 
-### Decision Tree
+### Run Decision Tree model
 ```bash
 python DecisionTreeRegressor.py
+# → prints Validation MAE and CV MAE
+# → outputs: submissionDecisionTreeRegressor.csv
 ```
-Outputs: `submissionDecisionTreeRegressor.csv`
 
-### Random Forest
+### Run Random Forest model
 ```bash
 python RandomForestRegressor.py
+# → prints Validation MAE and CV MAE
+# → outputs: submissionRandomForestRegressor.csv
 ```
-Outputs: `submissionRandomForestRegressor.csv`
+
+### Run XGBoost model
+```bash
+python xgboostregressor.py
+# → prints Validation MAE and CV MAE
+# → outputs: submissionXGBRegressor.csv
+```
+
+### Launch the HouseIQ Web App
+```bash
+python train_and_save_model.py   # train & save model
+cd api && python app.py          # start API server
+# open web/index.html in your browser
+```
 
 ---
 
 ## 📈 Conclusion
 
-Both models use the same features and preprocessing pipeline, making the comparison fair. The Random Forest consistently outperforms the Decision Tree because it leverages the power of **ensemble learning** — combining many weak learners into one strong predictor. For real-world regression tasks like housing price prediction, Random Forest is the preferred choice due to its better generalization, stability, and accuracy with minimal hyperparameter effort.
+> *"I started with a single Decision Tree to understand the data and establish a baseline (~$24k MAE). Then I moved to Random Forest, which immediately cut the error by ~27% just by averaging 100 trees. Finally, I brought in XGBoost, which leverages gradient boosting to squeeze out the best cross-validated performance at $16,895 CV MAE and a Kaggle score of 0.14785 — the best of all three. The key engineering decisions that helped across all models were: feature engineering (TotalSF, HouseAge, etc.), using Sklearn Pipelines to prevent data leakage, and relying on 5-fold cross-validation rather than a single train/val split to pick hyperparameters."*
+
+| What improved results the most |
+|---|
+| ✅ Feature engineering (`TotalSF`, `HouseAge`, `TotalBath`, `TotalPorchSF`) |
+| ✅ Pipeline-based preprocessing — no data leakage |
+| ✅ 5-fold cross-validation for hyperparameter selection |
+| ✅ Progressively switching: Decision Tree → Random Forest → XGBoost |

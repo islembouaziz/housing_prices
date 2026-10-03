@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HouseIQ — AI Housing Price Predictor</title>
+  <meta name="description" content="Predict housing prices using machine learning or find your ideal home profile within any budget." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0d14;
+      --surface: #111827;
+      --surface2: #1a2235;
+      --border: rgba(255,255,255,0.08);
+      --accent: #6366f1;
+      --accent2: #8b5cf6;
+      --accent-glow: rgba(99, 102, 241, 0.3);
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --radius: 14px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ─────────────────────────────────────── */
+    header {
+      padding: 28px 40px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(17,24,39,0.6);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .logo-text h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.5px; }
+    .logo-text p { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── TABS ────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      padding: 24px 40px 0;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .tab {
+      padding: 10px 22px;
+      border-radius: 10px 10px 0 0;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab.active {
+      background: var(--surface2);
+      color: var(--text);
+      border-color: var(--accent);
+      border-bottom-color: var(--surface2);
+    }
+    .tab:hover:not(.active) { color: var(--text); }
+
+    /* ── MAIN LAYOUT ─────────────────────────────────── */
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 40px 60px;
+    }
+    .panel {
+      display: none;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--accent);
+      border-radius: 0 var(--radius) var(--radius) var(--radius);
+      padding: 36px;
+    }
+    .panel.active { display: block; }
+
+    /* ── GRID ────────────────────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    /* ── SECTION LABELS ──────────────────────────────── */
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+
+    /* ── FORM GROUPS ─────────────────────────────────── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    label { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+    input, select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    select option { background: var(--surface); }
+
+    /* ── SLIDER ──────────────────────────────────────── */
+    .slider-wrapper { display: flex; flex-direction: column; gap: 8px; }
+    .slider-row { display: flex; align-items: center; gap: 12px; }
+    input[type="range"] {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--surface);
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+      cursor: pointer;
+    }
+    .slider-value {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 28px;
+      text-align: right;
+    }
+    .star-row { display: flex; gap: 4px; }
+    .star {
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: transform 0.1s;
+      color: #475569;
+    }
+    .star.lit { color: #f59e0b; }
+    .star:hover { transform: scale(1.2); }
+
+    /* ── BUTTON ──────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 13px 32px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 28px var(--accent-glow); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ── RESULT CARD ─────────────────────────────────── */
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      display: none;
+      animation: fadeIn 0.4s ease;
+    }
+    .result-card.show { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .price-display {
+      font-size: 2.8rem;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      background: linear-gradient(135deg, #a5b4fc, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin: 12px 0 4px;
+    }
+    .price-label { font-size: 0.8rem; color: var(--muted); }
+
+    .stat-row {
+      display: flex;
+      gap: 14px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .stat-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      flex: 1;
+      min-width: 120px;
+    }
+    .stat-chip .sc-val { font-size: 1.1rem; font-weight: 700; }
+    .stat-chip .sc-lbl { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+    /* ── CONFIDENCE BAR ──────────────────────────────── */
+    .conf-bar-wrap { margin-top: 18px; }
+    .conf-bar-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; }
+    .conf-bar-outer {
+      height: 8px;
+      background: var(--surface2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .conf-bar-inner {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.8s ease;
+    }
+
+    /* ── BUDGET PANEL ────────────────────────────────── */
+    .budget-input-row {
+      display: flex;
+      gap: 14px;
+      align-items: flex-end;
+      margin-bottom: 28px;
+    }
+    .budget-field { flex: 1; }
+
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+      margin-top: 20px;
+    }
+    .profile-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      display: none;
+      animation: fadeIn 0.4s ease;
+    }
+    .profile-card.show { display: block; }
+    .pc-icon { font-size: 1.6rem; margin-bottom: 10px; }
+    .pc-val { font-size: 1.3rem; font-weight: 700; }
+    .pc-lbl { font-size: 0.75rem; color: var(--muted); margin-top: 3px; }
+
+    .neighborhood-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .n-tag {
+      background: rgba(99,102,241,0.15);
+      border: 1px solid rgba(99,102,241,0.3);
+      color: #a5b4fc;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    /* ── DATASET STATS BAR ───────────────────────────── */
+    .stats-banner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 28px;
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+    .sb-stat { text-align: center; }
+    .sb-val { font-size: 1.1rem; font-weight: 700; }
+    .sb-lbl { font-size: 0.72rem; color: var(--muted); }
+
+    /* ── LOADING SPINNER ─────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── ERROR ───────────────────────────────────────── */
+    .error-msg {
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      margin-top: 12px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+
+    @media (max-width: 700px) {
+      header { padding: 20px; }
+      main, .tabs { padding-left: 16px; padding-right: 16px; }
+      .two-col { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .stats-banner { gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-icon">🏠</div>
+  <div class="logo-text">
+    <h1>HouseIQ</h1>
+    <p>AI-Powered Housing Price Intelligence</p>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('predict', this)">🔮 Predict Price</button>
+  <button class="tab" onclick="switchTab('budget', this)">🔍 Find by Budget</button>
+</div>
+
+<main>
+
+  <!-- ══ TAB 1: PREDICT PRICE ══════════════════════════ -->
+  <div id="tab-predict" class="panel active">
+    <div class="two-col">
+
+      <!-- Left: Form -->
+      <div>
+        <div class="section-label">House Details</div>
+        <div class="form-grid">
+
+          <div class="field full">
+            <label>Overall Quality</label>
+            <div class="slider-wrapper">
+              <div class="slider-row">
+                <input type="range" id="quality" min="1" max="10" value="5"
+                  oninput="updateSlider('quality', this.value); updateStars(this.value)">
+                <span class="slider-value" id="quality-val">5</span>
+              </div>
+              <div class="star-row" id="stars"></div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Living Area (sq ft)</label>
+            <input type="number" id="living-area" value="1500" min="300" max="6000" />
+          </div>
+          <div class="field">
+            <label>Basement Area (sq ft)</label>
+            <input type="number" id="basement-sf" value="800" min="0" max="4000" />
+          </div>
+          <div class="field">
+            <label>Garage Capacity (cars)</label>
+            <input type="number" id="garage-cars" value="2" min="0" max="5" />
+          </div>
+          <div class="field">
+            <label>Lot Area (sq ft)</label>
+            <input type="number" id="lot-area" value="8500" min="1000" />
+          </div>
+          <div class="field">
+            <label>Year Built</label>
+            <input type="number" id="year-built" value="2000" min="1870" max="2010" />
+          </div>
+          <div class="field">
+            <label>Full Bathrooms</label>
+            <input type="number" id="full-bath" value="2" min="0" max="6" />
+          </div>
+          <div class="field">
+            <label>Total Rooms (above grade)</label>
+            <input type="number" id="tot-rooms" value="7" min="2" max="15" />
+          </div>
+          <div class="field">
+            <label>Fireplaces</label>
+            <input type="number" id="fireplaces" value="1" min="0" max="4" />
+          </div>
+          <div class="field">
+            <label>Neighborhood</label>
+            <select id="neighborhood">
+              <option>NAmes</option><option>CollgCr</option><option>OldTown</option>
+              <option>Edwards</option><option>Somerst</option><option>Gilbert</option>
+              <option>NridgHt</option><option>Sawyer</option><option>NWAmes</option>
+              <option>SawyerW</option><option>BrkSide</option><option>Crawfor</option>
+              <option>Mitchel</option><option>NoRidge</option><option>Timber</option>
+              <option>IDOTRR</option><option>ClearCr</option><option>StoneBr</option>
+              <option>SWISU</option><option>Blmngtn</option><option>MeadowV</option>
+              <option>BrDale</option><option>Veenker</option><option>NPkVill</option>
+              <option>Blueste</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kitchen Quality</label>
+            <select id="kitchen-qual">
+              <option value="Ex">Excellent</option>
+              <option value="Gd">Good</option>
+              <option value="TA" selected>Average</option>
+              <option value="Fa">Fair</option>
+            </select>
+          </div>
+
+        </div>
+
+        <div style="margin-top: 24px;">
+          <button class="btn btn-primary" id="predict-btn" onclick="predictPrice()">
+            <span id="predict-btn-label">Predict Price</span>
+          </button>
+        </div>
+        <div class="error-msg" id="predict-error"></div>
+      </div>
+
+      <!-- Right: Result -->
+      <div>
+        <div class="section-label">Prediction Result</div>
+        <div class="result-card" id="predict-result">
+          <div class="price-label">Estimated Sale Price</div>
+          <div class="price-display" id="result-price">$0</div>
+          <div class="conf-bar-wrap">
+            <div class="conf-bar-label">Model Confidence</div>
+            <div class="conf-bar-outer">
+              <div class="conf-bar-inner" id="conf-bar" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-chip">
+              <div class="sc-val" id="r-age">—</div>
+              <div class="sc-lbl">House Age (years)</div>
+            </div>
+            <div class="stat-chip">
+              <div class="sc-val" id="r-sf">—</div>
+              <div class="sc-lbl">Total Sq Ft</div>
+            </div>
+            <div class="stat-chip">
+              <div class="sc-val" id="r-ppsf">—</div>
+              <div class="sc-lbl">Price / Sq Ft</div>
+            </div>
+          </div>
+          <p style="font-size: 0.75rem; color: var(--muted); margin-top: 18px;">
+            Predicted by a Random Forest model trained on 1,460 Ames, Iowa housing sales.
+          </p>
+        </div>
+
+        <!-- Placeholder when no prediction yet -->
+        <div id="predict-placeholder" style="text-align:center; padding: 60px 20px; color: var(--muted);">
+          <div style="font-size: 3rem; margin-bottom: 16px;">🏡</div>
+          <div style="font-size: 0.9rem;">Fill in the details and click <strong style="color:var(--text)">Predict Price</strong> to get an instant AI estimate.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ TAB 2: FIND BY BUDGET ═════════════════════════ -->
+  <div id="tab-budget" class="panel">
+
+    <!-- Dataset stats loaded from API -->
+    <div class="stats-banner" id="stats-banner" style="display:none;">
+      <div class="sb-stat"><div class="sb-val" id="stat-houses">—</div><div class="sb-lbl">Houses in Dataset</div></div>
+      <div class="sb-stat"><div class="sb-val" id="stat-min">—</div><div class="sb-lbl">Cheapest</div></div>
+      <div class="sb-stat"><div class="sb-val" id="stat-max">—</div><div class="sb-lbl">Most Expensive</div></div>
+      <div class="sb-stat"><div class="sb-val" id="stat-avg">—</div><div class="sb-lbl">Average Price</div></div>
+      <div class="sb-stat"><div class="sb-val" id="stat-med">—</div><div class="sb-lbl">Median Price</div></div>
+    </div>
+
+    <div class="section-label">Enter Your Budget</div>
+    <div class="budget-input-row">
+      <div class="field budget-field">
+        <label>Your Maximum Budget ($)</label>
+        <input type="number" id="budget-input" value="200000" min="50000" max="800000" step="5000" />
+      </div>
+      <div class="field" style="min-width:160px;">
+        <label>Tolerance (± %)</label>
+        <select id="budget-tolerance">
+          <option value="0.10">± 10%</option>
+          <option value="0.15" selected>± 15%</option>
+          <option value="0.20">± 20%</option>
+          <option value="0.25">± 25%</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="budget-btn" onclick="findByBudget()" style="margin-bottom:0; height:44px;">
+        <span id="budget-btn-label">Search</span>
+      </button>
+    </div>
+    <div class="error-msg" id="budget-error"></div>
+
+    <div class="profile-grid" id="profile-grid"></div>
+  </div>
+
+</main>
+
+<script>
+  const API = 'http://127.0.0.1:8000';
+
+  // ── Stars ─────────────────────────────────────────────────────────────────
+  function buildStars() {
+    const container = document.getElementById('stars');
+    for (let i = 1; i <= 10; i++) {
+      const s = document.createElement('span');
+      s.className = 'star';
+      s.textContent = '★';
+      s.dataset.val = i;
+      s.onclick = () => {
+        document.getElementById('quality').value = i;
+        updateSlider('quality', i);
+        updateStars(i);
+      };
+      container.appendChild(s);
+    }
+    updateStars(5);
+  }
+
+  function updateStars(val) {
+    document.querySelectorAll('.star').forEach((s, i) => {
+      s.classList.toggle('lit', i < val);
+    });
+  }
+
+  function updateSlider(id, val) {
+    document.getElementById(id + '-val').textContent = val;
+    updateStars(val);
+  }
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  function switchTab(name, el) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    el.classList.add('active');
+    if (name === 'budget') loadStats();
+  }
+
+  // ── Format currency ───────────────────────────────────────────────────────
+  function fmt(n) {
+    return '$' + Math.round(n).toLocaleString('en-US');
+  }
+
+  // ── PREDICT ───────────────────────────────────────────────────────────────
+  async function predictPrice() {
+    const btn = document.getElementById('predict-btn');
+    const lbl = document.getElementById('predict-btn-label');
+    const errEl = document.getElementById('predict-error');
+    errEl.classList.remove('show');
+
+    lbl.innerHTML = '<span class="spinner"></span> Predicting...';
+    btn.disabled = true;
+
+    const payload = {
+      OverallQual: parseInt(document.getElementById('quality').value),
+      GrLivArea: parseInt(document.getElementById('living-area').value),
+      TotalBsmtSF: parseInt(document.getElementById('basement-sf').value),
+      YearBuilt: parseInt(document.getElementById('year-built').value),
+      YrSold: 2010,
+      GarageCars: parseInt(document.getElementById('garage-cars').value),
+      FullBath: parseInt(document.getElementById('full-bath').value),
+      HalfBath: 0,
+      BsmtFullBath: 0,
+      BsmtHalfBath: 0,
+      TotRmsAbvGrd: parseInt(document.getElementById('tot-rooms').value),
+      Fireplaces: parseInt(document.getElementById('fireplaces').value),
+      LotArea: parseInt(document.getElementById('lot-area').value),
+      Neighborhood: document.getElementById('neighborhood').value,
+      MSZoning: 'RL',
+      HouseStyle: '1Story',
+      ExterQual: 'TA',
+      KitchenQual: document.getElementById('kitchen-qual').value,
+      BsmtQual: 'TA',
+      GarageArea: parseInt(document.getElementById('garage-cars').value) * 240,
+      OpenPorchSF: 40,
+      WoodDeckSF: 0,
+      EnclosedPorch: 0,
+      ScreenPorch: 0,
+      SSSnPorch: 0,
+      Foundation: 'PConc',
+      CentralAir: 'Y',
+      SaleType: 'WD',
+      SaleCondition: 'Normal',
+    };
+
+    try {
+      const res = await fetch(API + '/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('API error ' + res.status);
+      const data = await res.json();
+
+      document.getElementById('predict-placeholder').style.display = 'none';
+      const card = document.getElementById('predict-result');
+      card.classList.add('show');
+
+      document.getElementById('result-price').textContent = fmt(data.predicted_price);
+      document.getElementById('r-age').textContent = data.summary.house_age + ' yrs';
+      document.getElementById('r-sf').textContent = data.summary.total_sf.toLocaleString();
+      document.getElementById('r-ppsf').textContent = '$' + data.summary.price_per_sqft;
+
+      // Confidence: map price between 0 and 500k to 55–95%
+      const conf = Math.min(95, Math.max(55, 55 + (data.predicted_price / 500000) * 40));
+      document.getElementById('conf-bar').style.width = conf + '%';
+    } catch (err) {
+      errEl.textContent = 'Could not connect to the API. Make sure the Python backend is running on port 8000. Error: ' + err.message;
+      errEl.classList.add('show');
+    } finally {
+      lbl.textContent = 'Predict Price';
+      btn.disabled = false;
+    }
+  }
+
+  // ── LOAD STATS ────────────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const res = await fetch(API + '/stats');
+      const d = await res.json();
+      document.getElementById('stat-houses').textContent = d.total_houses.toLocaleString();
+      document.getElementById('stat-min').textContent = fmt(d.price_min);
+      document.getElementById('stat-max').textContent = fmt(d.price_max);
+      document.getElementById('stat-avg').textContent = fmt(d.price_avg);
+      document.getElementById('stat-med').textContent = fmt(d.price_median);
+      document.getElementById('stats-banner').style.display = 'flex';
+    } catch {}
+  }
+
+  // ── FIND BY BUDGET ────────────────────────────────────────────────────────
+  async function findByBudget() {
+    const btn = document.getElementById('budget-btn');
+    const lbl = document.getElementById('budget-btn-label');
+    const errEl = document.getElementById('budget-error');
+    errEl.classList.remove('show');
+
+    lbl.innerHTML = '<span class="spinner"></span>';
+    btn.disabled = true;
+
+    const budget = parseInt(document.getElementById('budget-input').value);
+    const tol = parseFloat(document.getElementById('budget-tolerance').value);
+
+    try {
+      const res = await fetch(`${API}/find-by-budget/${budget}?tolerance=${tol}`);
+      if (!res.ok) throw new Error('API error ' + res.status);
+      const data = await res.json();
+
+      const grid = document.getElementById('profile-grid');
+      grid.innerHTML = '';
+
+      if (!data.stats || data.stats.count === 0) {
+        errEl.textContent = data.message || 'No houses found in this price range.';
+        errEl.classList.add('show');
+        return;
+      }
+
+      const s = data.stats;
+      const cards = [
+        { icon: '🏘️', val: s.count + ' houses', lbl: 'Found in this range' },
+        { icon: '⭐', val: s.avg_overall_quality + '/10', lbl: 'Avg. Overall Quality' },
+        { icon: '📐', val: s.avg_living_area.toLocaleString() + ' ft²', lbl: 'Avg. Living Area' },
+        { icon: '📅', val: s.avg_year_built, lbl: 'Avg. Year Built' },
+        { icon: '🛏️', val: s.avg_bedrooms, lbl: 'Avg. Bedrooms' },
+        { icon: '🚿', val: s.avg_bathrooms, lbl: 'Avg. Bathrooms' },
+        { icon: '🚗', val: s.avg_garage_cars, lbl: 'Avg. Garage Cars' },
+        { icon: '❄️', val: s.central_air_pct + '%', lbl: 'Have Central Air' },
+        { icon: '💰', val: fmt(s.price_range.min) + ' – ' + fmt(s.price_range.max), lbl: 'Actual Price Range' },
+      ];
+
+      cards.forEach(c => {
+        const el = document.createElement('div');
+        el.className = 'profile-card show';
+        el.innerHTML = `<div class="pc-icon">${c.icon}</div><div class="pc-val">${c.val}</div><div class="pc-lbl">${c.lbl}</div>`;
+        grid.appendChild(el);
+      });
+
+      // Top neighborhoods
+      if (s.top_neighborhoods) {
+        const el = document.createElement('div');
+        el.className = 'profile-card show';
+        el.style.gridColumn = '1 / -1';
+        const tags = Object.entries(s.top_neighborhoods).map(([name, count]) =>
+          `<span class="n-tag">${name} (${count})</span>`
+        ).join('');
+        el.innerHTML = `<div class="pc-icon">🗺️</div><div class="pc-val" style="font-size:0.95rem">Top Neighborhoods</div><div class="neighborhood-tags" style="margin-top:10px">${tags}</div>`;
+        grid.appendChild(el);
+      }
+
+    } catch (err) {
+      errEl.textContent = 'Could not connect to the API. Make sure the Python backend is running on port 8000. Error: ' + err.message;
+      errEl.classList.add('show');
+    } finally {
+      lbl.textContent = 'Search';
+      btn.disabled = false;
+    }
+  }
+
+  // ── INIT ──────────────────────────────────────────────────────────────────
+  buildStars();
+</script>
+</body>
+</html>
