@@ -59,6 +59,7 @@ preprocessor = ColumnTransformer(
 # Define model
 model = DecisionTreeRegressor(max_leaf_nodes=42, random_state=0)
 
+
 # Bundle preprocessing and modeling code in a pipeline
 my_pipeline = Pipeline(steps=[('preprocessor', preprocessor),
                               ('model', model)])
@@ -100,3 +101,4 @@ print(f"Max Leaf Nodes: {leaf_nodes} \t\t Average CV MAE: {avg_mae:.2f}")
 preds_test = my_pipeline.predict(house_data_testing)
 output = pd.DataFrame({'Id': house_data_testing.index, 'SalePrice': preds_test})
 output.to_csv('submissionDecisionTreeRegressor.csv', index=False)
+
